@@ -9,27 +9,40 @@ from typing import Optional, Dict, Any, List
 
 # MongoDB configuration
 MONGODB_URI = os.getenv("MONGODB_URI")
-DATABASE_NAME = os.getenv("MONGODB_DATABASE", "autodoc")
-COLLECTION_NAME = "autodoc_sessions"
+DATABASE_NAME = os.getenv("MONGODB_DATABASE", "foodie")
+COLLECTION_NAME = "foodie_sessions"
 
 # Lazy connection - only connect when needed
 _client: Optional[MongoClient] = None
 _db = None
 _collection: Optional[Collection] = None
 _indexes_created = False
+_initializing = False  # Guard against recursive initialization
 
 def get_client() -> MongoClient:
     """Get or create MongoDB client with lazy initialization."""
-    global _client
-    if _client is None:
-        if not MONGODB_URI:
-            raise ValueError("MONGODB_URI environment variable is not set")
-        try:
-            _client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
-            # Test connection
-            _client.admin.command('ping')
-        except (ConfigurationError, ServerSelectionTimeoutError) as e:
-            raise ValueError(f"Failed to connect to MongoDB: {str(e)}. Please check your MONGODB_URI.")
+    global _client, _initializing
+    
+    if _client is not None:
+        return _client
+    
+    if _initializing:
+        raise RuntimeError("MongoDB client initialization already in progress")
+    
+    if not MONGODB_URI:
+        raise ValueError("MONGODB_URI environment variable is not set")
+    
+    _initializing = True
+    try:
+        _client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
+        # Test connection
+        _client.admin.command('ping')
+    except (ConfigurationError, ServerSelectionTimeoutError) as e:
+        _client = None
+        raise ValueError(f"Failed to connect to MongoDB: {str(e)}. Please check your MONGODB_URI.")
+    finally:
+        _initializing = False
+    
     return _client
 
 def get_db():
@@ -43,30 +56,47 @@ def get_db():
 def get_collection() -> Collection:
     """Get collection instance with lazy initialization."""
     global _collection, _indexes_created
-    if _collection is None:
-        db = get_db()
-        _collection = db[COLLECTION_NAME]
     
-    # Create indexes on first access
+    # Return existing collection if already initialized
+    if _collection is not None:
+        return _collection
+    
+    # Get collection
+    db = get_db()
+    _collection = db[COLLECTION_NAME]
+    
+    # Create indexes on first access (only once)
     if not _indexes_created:
-        try:
-            # TTL index on createdAt (24 hours)
-            _collection.create_index("createdAt", expireAfterSeconds=86400)
-            # Text index for search (optional)
-            _collection.create_index("ingredients")
-            _indexes_created = True
-            print("MongoDB indexes created")
-        except Exception as e:
-            print(f"Warning: Could not create indexes: {e}")
+        _create_indexes(_collection)
     
     return _collection
+
+def _create_indexes(collection: Collection):
+    """Helper function to create indexes."""
+    global _indexes_created
+    if _indexes_created:
+        return
+    
+    try:
+        # TTL index on createdAt (24 hours)
+        collection.create_index("createdAt", expireAfterSeconds=86400)
+        # Text index for search (optional)
+        collection.create_index("ingredients")
+        _indexes_created = True
+        print("MongoDB indexes created")
+    except Exception as e:
+        print(f"Warning: Could not create indexes: {e}")
+        # Set to True even on failure to prevent infinite retries
+        _indexes_created = True
 
 async def create_session(image_url: str) -> ObjectId:
     """
     Create a new session document with status 'pending'.
     Returns the session ID.
     """
+    # Get collection outside try block to avoid recursion if get_collection fails
     collection = get_collection()
+    
     now = datetime.utcnow()
     session_doc = {
         "imageUrl": image_url,
@@ -77,8 +107,13 @@ async def create_session(image_url: str) -> ObjectId:
         "updatedAt": now
     }
     
-    result = collection.insert_one(session_doc)
-    return result.inserted_id
+    try:
+        result = collection.insert_one(session_doc)
+        return result.inserted_id
+    except Exception as e:
+        error_msg = str(e)
+        # Avoid recursion by not calling get_collection() again in error handling
+        raise RuntimeError(f"Failed to create session in MongoDB: {error_msg}")
 
 async def get_session(session_id: str) -> Optional[Dict[str, Any]]:
     """
@@ -88,7 +123,13 @@ async def get_session(session_id: str) -> Optional[Dict[str, Any]]:
         collection = get_collection()
         session = collection.find_one({"_id": ObjectId(session_id)})
         return session
-    except Exception:
+    except ValueError as e:
+        # MongoDB connection or configuration error
+        print(f"MongoDB error in get_session: {e}")
+        raise
+    except Exception as e:
+        # Other errors (invalid ObjectId, etc.)
+        print(f"Error getting session {session_id}: {e}")
         return None
 
 async def update_session(session_id: str, update_data: Dict[str, Any]) -> bool:
