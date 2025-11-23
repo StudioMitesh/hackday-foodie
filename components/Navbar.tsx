@@ -21,6 +21,16 @@ export default function Navbar() {
           
           <div className="flex items-center space-x-4">
             <Link
+              href="/search"
+              className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                pathname === "/search"
+                  ? "bg-gradient-to-r from-orange-500 to-pink-500 text-white shadow-lg"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+              }`}
+            >
+              🔍 Search
+            </Link>
+            <Link
               href="/upload"
               className={`px-4 py-2 rounded-lg font-medium transition-all ${
                 pathname === "/upload"

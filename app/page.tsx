@@ -38,14 +38,14 @@ export default function Home() {
               </span>
             </p>
 
-            {/* CTA Button */}
+            {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Link
                 href="/upload"
                 className="group relative px-8 py-4 bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 text-white text-lg font-semibold rounded-full shadow-2xl hover:shadow-orange-500/50 transform hover:scale-105 transition-all duration-300 overflow-hidden"
               >
                 <span className="relative z-10 flex items-center">
-                  Get Started
+                  Upload Ingredients
                   <svg
                     className="ml-2 w-5 h-5 transform group-hover:translate-x-1 transition-transform"
                     fill="none"
@@ -61,6 +61,12 @@ export default function Home() {
                   </svg>
                 </span>
                 <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              </Link>
+              <Link
+                href="/search"
+                className="px-8 py-4 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-lg font-semibold rounded-full shadow-xl hover:shadow-2xl border-2 border-gray-200 dark:border-gray-700 hover:border-orange-400 transform hover:scale-105 transition-all duration-300"
+              >
+                🔍 Search Recipes
               </Link>
             </div>
           </div>
