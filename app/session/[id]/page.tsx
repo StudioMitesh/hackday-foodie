@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import axios from "axios";
 
 interface Recipe {
@@ -23,6 +24,7 @@ interface Session {
 
 export default function SessionPage() {
   const params = useParams();
+  const router = useRouter();
   const sessionId = params.id as string;
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,10 +61,12 @@ export default function SessionPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
+      <main className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p>Loading session...</p>
+          <div className="w-20 h-20 mx-auto mb-6">
+            <div className="animate-spin rounded-full h-20 w-20 border-4 border-orange-200 border-t-orange-500"></div>
+          </div>
+          <p className="text-xl text-gray-700 dark:text-gray-300">Loading session...</p>
         </div>
       </main>
     );
@@ -70,9 +74,16 @@ export default function SessionPage() {
 
   if (error && !session) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600 dark:text-red-400">{error}</p>
+      <main className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-8">
+        <div className="text-center max-w-md">
+          <div className="text-6xl mb-4">😕</div>
+          <p className="text-xl text-red-600 dark:text-red-400 mb-4">{error}</p>
+          <Link
+            href="/upload"
+            className="inline-block px-6 py-3 bg-gradient-to-r from-orange-500 to-pink-500 text-white font-semibold rounded-full hover:shadow-lg transform hover:scale-105 transition-all"
+          >
+            Try Again
+          </Link>
         </div>
       </main>
     );
@@ -81,42 +92,77 @@ export default function SessionPage() {
   const isProcessing = session?.status === "pending" || session?.status === "processing";
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-4xl font-bold mb-8">Session Details</h1>
+    <main className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-12">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl sm:text-5xl font-extrabold mb-2">
+              <span className="bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 bg-clip-text text-transparent">
+                Your Recipe Session
+              </span>
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">Session ID: {sessionId.slice(0, 8)}...</p>
+          </div>
+          <Link
+            href="/upload"
+            className="px-4 py-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-all"
+          >
+            New Upload
+          </Link>
+        </div>
 
+        {/* Processing Status */}
         {isProcessing && (
-          <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <div className="flex items-center">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
-              <p className="text-blue-800 dark:text-blue-200">Processing your ingredients...</p>
+          <div className="mb-8 p-6 bg-gradient-to-r from-orange-100 to-pink-100 dark:from-orange-900/20 dark:to-pink-900/20 rounded-2xl border border-orange-200 dark:border-orange-800">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-orange-200 border-t-orange-500"></div>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                  Processing your ingredients...
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Our AI is analyzing your image and generating delicious recipes
+                </p>
+              </div>
             </div>
           </div>
         )}
 
+        {/* Image Preview */}
         {session?.imageUrl && (
-          <div className="mb-6">
-            <h2 className="text-2xl font-semibold mb-4">Uploaded Image</h2>
-            <div className="relative w-full h-64 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden">
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center">
+              <span className="mr-2">📷</span>
+              Uploaded Image
+            </h2>
+            <div className="relative w-full h-64 sm:h-96 rounded-2xl overflow-hidden shadow-2xl">
               <img
                 src={session.imageUrl}
                 alt="Uploaded ingredients"
-                className="w-full h-full object-contain"
+                className="w-full h-full object-cover"
               />
             </div>
           </div>
         )}
 
+        {/* Results Section */}
         {session?.status === "complete" && (
-          <>
+          <div className="space-y-8">
+            {/* Ingredients */}
             {session.ingredients && session.ingredients.length > 0 && (
-              <div className="mb-6">
-                <h2 className="text-2xl font-semibold mb-4">Detected Ingredients</h2>
-                <div className="flex flex-wrap gap-2">
+              <div>
+                <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200 mb-6 flex items-center">
+                  <span className="mr-3 text-4xl">🥬</span>
+                  Detected Ingredients
+                </h2>
+                <div className="flex flex-wrap gap-3">
                   {session.ingredients.map((ingredient, idx) => (
                     <span
                       key={idx}
-                      className="px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded-full text-sm font-medium"
+                      className="px-5 py-2.5 bg-gradient-to-r from-green-400 to-emerald-500 text-white font-semibold rounded-full shadow-lg hover:scale-110 transform transition-transform"
                     >
                       {ingredient}
                     </span>
@@ -125,25 +171,45 @@ export default function SessionPage() {
               </div>
             )}
 
+            {/* Recipes */}
             {session.recipes && session.recipes.length > 0 && (
               <div>
-                <h2 className="text-2xl font-semibold mb-4">Generated Recipes</h2>
-                <div className="grid gap-6 md:grid-cols-2">
+                <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200 mb-6 flex items-center">
+                  <span className="mr-3 text-4xl">🍽️</span>
+                  Generated Recipes
+                </h2>
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                   {session.recipes.map((recipe, idx) => (
                     <div
                       key={idx}
-                      className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6"
+                      className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all border border-gray-200 dark:border-gray-700 transform hover:scale-105"
                     >
-                      <h3 className="text-xl font-bold mb-2">{recipe.name}</h3>
-                      <p className="text-gray-600 dark:text-gray-400 mb-4">
-                        {recipe.description}
-                      </p>
-                      <div>
-                        <h4 className="font-semibold mb-2">Steps:</h4>
-                        <ol className="list-decimal list-inside space-y-2">
+                      <div className="mb-4">
+                        <div className="w-16 h-16 bg-gradient-to-br from-orange-400 to-pink-500 rounded-xl flex items-center justify-center text-3xl mb-3">
+                          🍳
+                        </div>
+                        <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-2">
+                          {recipe.name}
+                        </h3>
+                        <p className="text-gray-600 dark:text-gray-400 text-sm">
+                          {recipe.description}
+                        </p>
+                      </div>
+                      <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                        <h4 className="font-semibold text-gray-800 dark:text-gray-200 mb-3 flex items-center">
+                          <span className="mr-2">📝</span>
+                          Steps:
+                        </h4>
+                        <ol className="space-y-2">
                           {recipe.steps.map((step, stepIdx) => (
-                            <li key={stepIdx} className="text-sm">
-                              {step}
+                            <li
+                              key={stepIdx}
+                              className="text-sm text-gray-700 dark:text-gray-300 flex items-start"
+                            >
+                              <span className="flex-shrink-0 w-6 h-6 bg-gradient-to-br from-orange-400 to-pink-500 text-white rounded-full flex items-center justify-center text-xs font-bold mr-2 mt-0.5">
+                                {stepIdx + 1}
+                              </span>
+                              <span>{step}</span>
                             </li>
                           ))}
                         </ol>
@@ -153,18 +219,51 @@ export default function SessionPage() {
                 </div>
               </div>
             )}
-          </>
-        )}
-
-        {session?.status === "error" && (
-          <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <p className="text-red-800 dark:text-red-200">
-              An error occurred while processing your image. Please try again.
-            </p>
           </div>
         )}
+
+        {/* Error State */}
+        {session?.status === "error" && (
+          <div className="p-8 bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-2xl text-center">
+            <div className="text-6xl mb-4">😞</div>
+            <h3 className="text-2xl font-bold text-red-800 dark:text-red-200 mb-2">
+              Processing Error
+            </h3>
+            <p className="text-red-600 dark:text-red-400 mb-6">
+              An error occurred while processing your image. Please try again.
+            </p>
+            <Link
+              href="/upload"
+              className="inline-block px-6 py-3 bg-gradient-to-r from-orange-500 to-pink-500 text-white font-semibold rounded-full hover:shadow-lg transform hover:scale-105 transition-all"
+            >
+              Upload New Image
+            </Link>
+          </div>
+        )}
+
+        {/* Back to Home */}
+        <div className="mt-12 text-center">
+          <Link
+            href="/"
+            className="inline-flex items-center text-gray-600 dark:text-gray-400 hover:text-orange-500 transition-colors"
+          >
+            <svg
+              className="w-5 h-5 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
+            </svg>
+            Back to home
+          </Link>
+        </div>
       </div>
     </main>
   );
 }
-
