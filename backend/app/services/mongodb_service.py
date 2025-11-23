@@ -34,7 +34,7 @@ def get_client() -> MongoClient:
     
     _initializing = True
     try:
-        _client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
+        _client = MongoClient(MONGODB_URI, tls=True, serverSelectionTimeoutMS=5000)
         # Test connection
         _client.admin.command('ping')
     except (ConfigurationError, ServerSelectionTimeoutError) as e:
