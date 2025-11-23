@@ -1,39 +1,72 @@
 from pymongo import MongoClient
 from pymongo.collection import Collection
+from pymongo.errors import ConfigurationError, ServerSelectionTimeoutError
 from bson import ObjectId
 from datetime import datetime, timedelta
 import os
 import math
 from typing import Optional, Dict, Any, List
 
-# MongoDB connection
+# MongoDB configuration
 MONGODB_URI = os.getenv("MONGODB_URI")
-DATABASE_NAME = os.getenv("MONGODB_DATABASE", "foodie")
-COLLECTION_NAME = "foodie_sessions"
+DATABASE_NAME = os.getenv("MONGODB_DATABASE", "autodoc")
+COLLECTION_NAME = "autodoc_sessions"
 
-client = MongoClient(MONGODB_URI)
-db = client[DATABASE_NAME]
-collection: Collection = db[COLLECTION_NAME]
+# Lazy connection - only connect when needed
+_client: Optional[MongoClient] = None
+_db = None
+_collection: Optional[Collection] = None
+_indexes_created = False
 
-# Create indexes on first run
-def ensure_indexes():
-    """Create TTL index and vector search index (if supported)"""
-    # TTL index on createdAt (24 hours)
-    collection.create_index("createdAt", expireAfterSeconds=86400)
+def get_client() -> MongoClient:
+    """Get or create MongoDB client with lazy initialization."""
+    global _client
+    if _client is None:
+        if not MONGODB_URI:
+            raise ValueError("MONGODB_URI environment variable is not set")
+        try:
+            _client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
+            # Test connection
+            _client.admin.command('ping')
+        except (ConfigurationError, ServerSelectionTimeoutError) as e:
+            raise ValueError(f"Failed to connect to MongoDB: {str(e)}. Please check your MONGODB_URI.")
+    return _client
+
+def get_db():
+    """Get database instance."""
+    global _db
+    if _db is None:
+        client = get_client()
+        _db = client[DATABASE_NAME]
+    return _db
+
+def get_collection() -> Collection:
+    """Get collection instance with lazy initialization."""
+    global _collection, _indexes_created
+    if _collection is None:
+        db = get_db()
+        _collection = db[COLLECTION_NAME]
     
-    # Text index for search (optional)
-    collection.create_index("ingredients")
+    # Create indexes on first access
+    if not _indexes_created:
+        try:
+            # TTL index on createdAt (24 hours)
+            _collection.create_index("createdAt", expireAfterSeconds=86400)
+            # Text index for search (optional)
+            _collection.create_index("ingredients")
+            _indexes_created = True
+            print("MongoDB indexes created")
+        except Exception as e:
+            print(f"Warning: Could not create indexes: {e}")
     
-    print("MongoDB indexes created")
-
-# Initialize indexes
-ensure_indexes()
+    return _collection
 
 async def create_session(image_url: str) -> ObjectId:
     """
     Create a new session document with status 'pending'.
     Returns the session ID.
     """
+    collection = get_collection()
     now = datetime.utcnow()
     session_doc = {
         "imageUrl": image_url,
@@ -52,6 +85,7 @@ async def get_session(session_id: str) -> Optional[Dict[str, Any]]:
     Get a session by ID.
     """
     try:
+        collection = get_collection()
         session = collection.find_one({"_id": ObjectId(session_id)})
         return session
     except Exception:
@@ -62,6 +96,7 @@ async def update_session(session_id: str, update_data: Dict[str, Any]) -> bool:
     Update a session document.
     """
     try:
+        collection = get_collection()
         update_data["updatedAt"] = datetime.utcnow()
         result = collection.update_one(
             {"_id": ObjectId(session_id)},
@@ -94,6 +129,7 @@ async def search_similar_recipes(query_embedding: List[float], limit: int = 5) -
     Note: For production, use Atlas Vector Search aggregation pipeline for better performance.
     """
     try:
+        collection = get_collection()
         # Get all sessions with completed recipes
         sessions = collection.find({
             "status": "complete",
