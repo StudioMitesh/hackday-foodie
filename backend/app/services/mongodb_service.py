@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 import os
 import math
 from typing import Optional, Dict, Any, List
+import json
+import certifi
 
 # MongoDB configuration
 MONGODB_URI = os.getenv("MONGODB_URI")
@@ -34,7 +36,7 @@ def get_client() -> MongoClient:
     
     _initializing = True
     try:
-        _client = MongoClient(MONGODB_URI, tls=True, serverSelectionTimeoutMS=5000)
+        _client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000, tlsCAFile=certifi.where())
         # Test connection
         _client.admin.command('ping')
     except (ConfigurationError, ServerSelectionTimeoutError) as e:
